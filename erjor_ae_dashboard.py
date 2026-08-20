@@ -174,6 +174,89 @@ if identified_ae is not None:
     # ===== WATERFALL PLOTS =====
     st.subheader("📈 Your Position Across Key Metrics")
     
+    # Filter by manuscript type for decisions pie charts
+    st.write("**Filter by Manuscript Type:**")
+    col_filter1, col_filter2, col_filter3 = st.columns(3)
+    
+    all_manuscript_types = sorted(df_filtered['Manuscript Type'].unique())
+    
+    with col_filter1:
+        selected_type = st.selectbox(
+            "Select manuscript type:",
+            ['All Types'] + all_manuscript_types,
+            index=0,
+            key='manuscript_filter'
+        )
+    
+    # Filter data based on selection
+    if selected_type == 'All Types':
+        user_papers_filtered_type = user_papers
+        df_filtered_type = df_filtered
+        type_label = "All Types"
+    else:
+        user_papers_filtered_type = user_papers[user_papers['Manuscript Type'] == selected_type]
+        df_filtered_type = df_filtered[df_filtered['Manuscript Type'] == selected_type]
+        type_label = selected_type
+    
+    # Recalculate accept/reject for selected type
+    type_accepts = len(user_papers_filtered_type[user_papers_filtered_type['Accept or Reject Final Decision'] == 'Accept'])
+    type_rejects = len(user_papers_filtered_type[user_papers_filtered_type['Accept or Reject Final Decision'] == 'Reject'])
+    type_total_accepts = len(df_filtered_type[df_filtered_type['Accept or Reject Final Decision'] == 'Accept'])
+    type_total_rejects = len(df_filtered_type[df_filtered_type['Accept or Reject Final Decision'] == 'Reject'])
+    
+    st.divider()
+    
+    # Accept/Reject Pie Charts (filtered by type)
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Your accept/reject breakdown (filtered)
+        your_decisions_type = pd.Series({
+            'Accept': type_accepts,
+            'Reject': type_rejects
+        })
+        
+        fig_your_decisions_type = go.Figure(data=[go.Pie(
+            labels=your_decisions_type.index,
+            values=your_decisions_type.values,
+            marker_colors=['#20854E', '#E18727'],
+            textposition='inside',
+            textinfo='label+percent',
+            hovertemplate='<b>%{label}</b><br>Count: %{value}<br>Percent: %{percent}<extra></extra>'
+        )])
+        
+        type_accept_pct = (type_accepts / (type_accepts + type_rejects) * 100) if (type_accepts + type_rejects) > 0 else 0
+        fig_your_decisions_type.update_layout(
+            title=f"Your Decisions – {type_label}<br>({type_accepts + type_rejects} papers)<br>Accept Rate: {type_accept_pct:.1f}%",
+            height=350,
+        )
+        st.plotly_chart(fig_your_decisions_type, use_container_width=True)
+    
+    with col2:
+        # Overall accept/reject breakdown (filtered)
+        overall_decisions_type = pd.Series({
+            'Accept': type_total_accepts,
+            'Reject': type_total_rejects
+        })
+        
+        fig_overall_decisions_type = go.Figure(data=[go.Pie(
+            labels=overall_decisions_type.index,
+            values=overall_decisions_type.values,
+            marker_colors=['#20854E', '#E18727'],
+            textposition='inside',
+            textinfo='label+percent',
+            hovertemplate='<b>%{label}</b><br>Count: %{value}<br>Percent: %{percent}<extra></extra>'
+        )])
+        
+        type_overall_accept_pct = (type_total_accepts / (type_total_accepts + type_total_rejects) * 100) if (type_total_accepts + type_total_rejects) > 0 else 0
+        fig_overall_decisions_type.update_layout(
+            title=f"All Journal Decisions – {type_label}<br>({type_total_accepts + type_total_rejects} papers)<br>Accept Rate: {type_overall_accept_pct:.1f}%",
+            height=350,
+        )
+        st.plotly_chart(fig_overall_decisions_type, use_container_width=True)
+    
+    st.divider()
+    
     # Waterfall 1: Total Reviews
     fig_reviews = go.Figure()
     ae_sorted_reviews = ae_metrics.sort_values('review_count', ascending=False).reset_index(drop=True)
@@ -200,55 +283,6 @@ if identified_ae is not None:
         bargap=0.2
     )
     st.plotly_chart(fig_reviews, use_container_width=True)
-    
-    # Accept/Reject Pie Charts
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # Your accept/reject breakdown
-        your_decisions = pd.Series({
-            'Accept': user_accepts,
-            'Reject': user_rejects
-        })
-        
-        fig_your_decisions = go.Figure(data=[go.Pie(
-            labels=your_decisions.index,
-            values=your_decisions.values,
-            marker_colors=['#20854E', '#E18727'],
-            textposition='inside',
-            textinfo='label+percent',
-            hovertemplate='<b>%{label}</b><br>Count: %{value}<br>Percent: %{percent}<extra></extra>'
-        )])
-        
-        accept_pct = (user_accepts / (user_accepts + user_rejects) * 100) if (user_accepts + user_rejects) > 0 else 0
-        fig_your_decisions.update_layout(
-            title=f"Your Decisions ({user_accepts + user_rejects} total)<br>Accept Rate: {accept_pct:.1f}%",
-            height=350,
-        )
-        st.plotly_chart(fig_your_decisions, use_container_width=True)
-    
-    with col2:
-        # Overall accept/reject breakdown
-        overall_decisions = pd.Series({
-            'Accept': total_accepts,
-            'Reject': total_rejects
-        })
-        
-        fig_overall_decisions = go.Figure(data=[go.Pie(
-            labels=overall_decisions.index,
-            values=overall_decisions.values,
-            marker_colors=['#20854E', '#E18727'],
-            textposition='inside',
-            textinfo='label+percent',
-            hovertemplate='<b>%{label}</b><br>Count: %{value}<br>Percent: %{percent}<extra></extra>'
-        )])
-        
-        overall_accept_pct = (total_accepts / (total_accepts + total_rejects) * 100) if (total_accepts + total_rejects) > 0 else 0
-        fig_overall_decisions.update_layout(
-            title=f"All Journal Decisions ({total_accepts + total_rejects} total)<br>Accept Rate: {overall_accept_pct:.1f}%",
-            height=350,
-        )
-        st.plotly_chart(fig_overall_decisions, use_container_width=True)
     
     # Waterfall 2: % Accept
     ae_decisions = df_filtered.groupby('Editor Names').apply(
@@ -288,33 +322,33 @@ if identified_ae is not None:
     )
     st.plotly_chart(fig_pct_accept, use_container_width=True)
     
-    # Waterfall 3: Median Citations per Paper
-    fig_median = go.Figure()
-    ae_sorted_median = ae_metrics.sort_values('median_citations', ascending=False).reset_index(drop=True)
+    # Waterfall 3: Mean Citations per Paper
+    fig_mean = go.Figure()
+    ae_sorted_mean = ae_metrics.sort_values('avg_citations', ascending=False).reset_index(drop=True)
     
-    colors_median = ['#7876B1' if name != identified_ae['Editor Names'] else '#BC3C29' 
-                     for name in ae_sorted_median['Editor Names']]
+    colors_mean = ['#7876B1' if name != identified_ae['Editor Names'] else '#BC3C29' 
+                   for name in ae_sorted_mean['Editor Names']]
     
-    fig_median.add_trace(go.Bar(
-        x=ae_sorted_median.index + 1,
-        y=ae_sorted_median['median_citations'],
-        marker_color=colors_median,
-        text=ae_sorted_median['median_citations'].astype(str),
+    fig_mean.add_trace(go.Bar(
+        x=ae_sorted_mean.index + 1,
+        y=ae_sorted_mean['avg_citations'],
+        marker_color=colors_mean,
+        text=ae_sorted_mean['avg_citations'].astype(str),
         textposition='outside',
-        hovertemplate='<b>Rank %{x}</b><br>Median Citations: %{y}<extra></extra>',
+        hovertemplate='<b>Rank %{x}</b><br>Mean Citations: %{y:.2f}<extra></extra>',
         showlegend=False
     ))
     
-    your_median_rank = ae_sorted_median[ae_sorted_median['Editor Names'] == identified_ae['Editor Names']].index[0] + 1
-    fig_median.update_layout(
-        title=f"Median Citations per Paper – Your Rank: #{your_median_rank} ({identified_ae['median_citations']} citations)",
-        xaxis_title="AE Rank (Highest to Lowest Median)",
-        yaxis_title="Median Citations",
+    your_mean_rank = ae_sorted_mean[ae_sorted_mean['Editor Names'] == identified_ae['Editor Names']].index[0] + 1
+    fig_mean.update_layout(
+        title=f"Mean Citations per Paper – Your Rank: #{your_mean_rank} ({identified_ae['avg_citations']:.2f} citations)",
+        xaxis_title="AE Rank (Highest to Lowest Mean)",
+        yaxis_title="Mean Citations",
         height=350,
         hovermode='x unified',
         bargap=0.2
     )
-    st.plotly_chart(fig_median, use_container_width=True)
+    st.plotly_chart(fig_mean, use_container_width=True)
     
     # Waterfall 4: % of Papers in Top Decile for Citations
     # Calculate top decile threshold
@@ -357,6 +391,54 @@ if identified_ae is not None:
         yaxis=dict(range=[0, 100])
     )
     st.plotly_chart(fig_decile, use_container_width=True)
+    
+    # Waterfall 5: Your Accepted Articles by Citations
+    st.subheader("📄 Your Accepted Articles – Citation Impact")
+    
+    your_accepted = user_papers[user_papers['Accept or Reject Final Decision'] == 'Accept'].copy()
+    your_accepted = your_accepted.sort_values('Number of Citations', ascending=False)
+    
+    if len(your_accepted) > 0:
+        # Create color map for manuscript types
+        type_colors = {
+            'Original Research Article': '#0072B5',
+            'Review': '#BC3C29',
+            'Invited Review': '#E18727',
+            'Study Protocol': '#20854E',
+            'Editorial': '#7876B1',
+            'Research Letter': '#FFC000',
+            'Correspondence': '#00B4D8'
+        }
+        
+        colors_articles = [type_colors.get(mtype, '#7876B1') for mtype in your_accepted['Manuscript Type']]
+        
+        # Truncate titles for display
+        article_labels = [title[:40] + '...' if len(title) > 40 else title 
+                         for title in your_accepted['Manuscript Title']]
+        
+        fig_accepted = go.Figure()
+        fig_accepted.add_trace(go.Bar(
+            x=your_accepted.index + 1,
+            y=your_accepted['Number of Citations'],
+            marker_color=colors_articles,
+            text=your_accepted['Number of Citations'].astype(int),
+            customdata=your_accepted['Manuscript Type'],
+            textposition='outside',
+            hovertemplate='<b>%{customdata}</b><br>Citations: %{y}<extra></extra>',
+            showlegend=False
+        ))
+        
+        fig_accepted.update_layout(
+            title=f"Your {len(your_accepted)} Accepted Articles – Citations (Sorted Highest to Lowest)",
+            xaxis_title="Article (Sorted by Citation Count)",
+            yaxis_title="Number of Citations",
+            height=400,
+            hovermode='x unified',
+            bargap=0.3
+        )
+        st.plotly_chart(fig_accepted, use_container_width=True)
+    else:
+        st.info("No accepted articles to display.")
     
     # Your papers
     st.subheader("📄 Your Reviews & Citations")
@@ -413,38 +495,7 @@ if identified_ae is not None:
     )
 
 # ============================================================================
-# SECTION 2: Anonymized Pack Rankings (always shown)
-# ============================================================================
-st.divider()
-st.subheader("📊 Anonymized AE Rankings")
-
-# Ranking table
-ranking_table = ae_metrics[[
-    'rank', 'review_count', 'avg_citations', 'median_citations', 'total_citations'
-]].copy()
-
-ranking_table.columns = ['Rank', 'Reviews', 'Avg Citations', 'Median Citations', 'Total Citations']
-
-# Highlight identified AE
-if identified_ae is not None:
-    def highlight_row(row):
-        if row['Rank'] == identified_ae['rank']:
-            return ['background-color: #E8F4F8'] * len(row)
-        return [''] * len(row)
-    
-    styled_table = ranking_table.style.apply(highlight_row, axis=1)
-else:
-    styled_table = ranking_table.style
-
-st.dataframe(
-    styled_table,
-    use_container_width=True,
-    height=600,
-    hide_index=True
-)
-
-# ============================================================================
-# SECTION 3: Pack Statistics
+# SECTION 2: Pack Statistics
 # ============================================================================
 st.divider()
 st.subheader("📈 Pack Statistics")
