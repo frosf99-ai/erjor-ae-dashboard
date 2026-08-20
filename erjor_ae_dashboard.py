@@ -94,9 +94,7 @@ if user_surname:
 # MAIN PAGE
 # ============================================================================
 st.title("ERJOR Associate Editor Activity & Citations")
-date_min = df_filtered['Latest Decision Date'].min()
-date_max = df_filtered['Latest Decision Date'].max()
-st.markdown(f"_Data from {date_min.strftime('%b %Y')} – {date_max.strftime('%b %Y')}_")
+st.markdown(f"**Data for the 2025 Journal Citation Report window** (Papers published in Aug 2022–Aug 2024)")
 
 # Calculate pack totals (always needed for later sections)
 total_accepts = len(df_filtered[df_filtered['Accept or Reject Final Decision'] == 'Accept'])
@@ -418,7 +416,7 @@ if identified_ae is not None:
     
     # Track median filter state
     if 'median_filter_state' not in st.session_state:
-        st.session_state.median_filter_state = 'All Types'
+        st.session_state.median_filter_state = 'Orig Research & Reviews'
     
     if btn_med_combo:
         st.session_state.median_filter_state = 'Orig Research & Reviews'
