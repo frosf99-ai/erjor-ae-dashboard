@@ -103,7 +103,66 @@ total_accepts = len(df_filtered[df_filtered['Accept or Reject Final Decision'] =
 total_rejects = len(df_filtered[df_filtered['Accept or Reject Final Decision'] == 'Reject'])
 
 # ============================================================================
-# SECTION 1: Individual AE View (if identified)
+# SECTION 1: Overall ERJ Open Research Statistics
+# ============================================================================
+st.divider()
+st.subheader("📈 Overall ERJ Open Research Statistics")
+
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.metric("Total AEs", len(ae_metrics))
+with col2:
+    st.metric("Total Reviews (All)", int(ae_metrics['review_count'].sum()))
+with col3:
+    st.metric("Mean/AE", f"{ae_metrics['review_count'].mean():.1f}")
+with col4:
+    st.metric("Median/AE", f"{ae_metrics['review_count'].median():.0f}")
+
+# Accept/Reject summary
+col1, col2, col3 = st.columns(3)
+total_all = total_accepts + total_rejects
+
+with col1:
+    st.metric("Total Accepts", total_accepts)
+with col2:
+    st.metric("Total Rejects", total_rejects)
+with col3:
+    accept_rate = (total_accepts / total_all * 100) if total_all > 0 else 0
+    st.metric("Accept Rate", f"{accept_rate:.1f}%")
+
+# Citations summary
+col1, col2, col3 = st.columns(3)
+total_cites = int(ae_metrics['total_citations'].sum())
+mean_cites_per_ae = ae_metrics['avg_citations'].mean()
+
+with col1:
+    st.metric("Total Citations (All AEs)", total_cites)
+with col2:
+    st.metric("Mean Avg Citations/AE", f"{mean_cites_per_ae:.2f}")
+with col3:
+    st.metric("Median Avg Citations/AE", f"{ae_metrics['avg_citations'].median():.2f}")
+
+# Manuscript Type breakdown across pack
+st.subheader("📋 All Papers by Manuscript Type")
+manuscript_all = df_filtered['Manuscript Type'].value_counts()
+
+fig_types_all = go.Figure(data=[go.Pie(
+    labels=manuscript_all.index,
+    values=manuscript_all.values,
+    marker_colors=['#0072B5', '#BC3C29', '#E18727', '#20854E', '#7876B1', '#FFC000', '#00B4D8', '#90E0EF'],
+    textposition='inside',
+    textinfo='label+percent',
+    hovertemplate='<b>%{label}</b><br>Count: %{value}<br>Percent: %{percent}<extra></extra>'
+)])
+
+fig_types_all.update_layout(
+    title=f"All Papers by Manuscript Type ({len(df_filtered)} total)",
+    height=400,
+)
+st.plotly_chart(fig_types_all, use_container_width=True)
+
+# ============================================================================
+# SECTION 2: Individual AE View (if identified)
 # ============================================================================
 if identified_ae is not None:
     st.divider()
@@ -590,66 +649,7 @@ if identified_ae is not None:
     )
 
 # ============================================================================
-# SECTION 2: Pack Statistics
-# ============================================================================
-st.divider()
-st.subheader("📈 Pack Statistics")
-
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    st.metric("Total AEs", len(ae_metrics))
-with col2:
-    st.metric("Total Reviews (All)", int(ae_metrics['review_count'].sum()))
-with col3:
-    st.metric("Mean/AE", f"{ae_metrics['review_count'].mean():.1f}")
-with col4:
-    st.metric("Median/AE", f"{ae_metrics['review_count'].median():.0f}")
-
-# Accept/Reject summary
-col1, col2, col3 = st.columns(3)
-total_all = total_accepts + total_rejects
-
-with col1:
-    st.metric("Total Accepts", total_accepts)
-with col2:
-    st.metric("Total Rejects", total_rejects)
-with col3:
-    accept_rate = (total_accepts / total_all * 100) if total_all > 0 else 0
-    st.metric("Accept Rate", f"{accept_rate:.1f}%")
-
-# Citations summary
-col1, col2, col3 = st.columns(3)
-total_cites = int(ae_metrics['total_citations'].sum())
-mean_cites_per_ae = ae_metrics['avg_citations'].mean()
-
-with col1:
-    st.metric("Total Citations (All AEs)", total_cites)
-with col2:
-    st.metric("Mean Avg Citations/AE", f"{mean_cites_per_ae:.2f}")
-with col3:
-    st.metric("Median Avg Citations/AE", f"{ae_metrics['avg_citations'].median():.2f}")
-
-# Manuscript Type breakdown across pack
-st.subheader("📋 All Papers by Manuscript Type")
-manuscript_all = df_filtered['Manuscript Type'].value_counts()
-
-fig_types_all = go.Figure(data=[go.Pie(
-    labels=manuscript_all.index,
-    values=manuscript_all.values,
-    marker_colors=['#0072B5', '#BC3C29', '#E18727', '#20854E', '#7876B1', '#FFC000', '#00B4D8', '#90E0EF'],
-    textposition='inside',
-    textinfo='label+percent',
-    hovertemplate='<b>%{label}</b><br>Count: %{value}<br>Percent: %{percent}<extra></extra>'
-)])
-
-fig_types_all.update_layout(
-    title=f"All Papers by Manuscript Type ({len(df_filtered)} total)",
-    height=400,
-)
-st.plotly_chart(fig_types_all, use_container_width=True)
-
-# ============================================================================
-# SECTION 4: Notes
+# SECTION 3: Notes
 # ============================================================================
 st.divider()
 st.markdown("""
