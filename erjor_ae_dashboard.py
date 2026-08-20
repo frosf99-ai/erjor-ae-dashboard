@@ -370,7 +370,12 @@ if identified_ae is not None:
     
     # Filter data for median calculation
     if median_filter == 'All Types':
-        ae_median_filtered = ae_metrics[['Editor Names', 'median_citations']].copy()
+        df_median_filtered = df_accepted
+        ae_median_filtered = df_median_filtered.groupby('Editor Names').agg({
+            'Number of Citations': ['median'],
+        }).round(2)
+        ae_median_filtered.columns = ['median_citations']
+        ae_median_filtered = ae_median_filtered.reset_index()
         ae_median_filtered = ae_median_filtered.sort_values('median_citations', ascending=False).reset_index(drop=True)
         median_label = "All Types"
     elif median_filter == 'Original Research Article':
@@ -417,7 +422,7 @@ if identified_ae is not None:
         your_median_value = "N/A"
     
     fig_median.update_layout(
-        title=f"Median Citations per Paper – {median_label} – Your Rank: #{your_median_rank} ({your_median_value} citations)",
+        title=f"Median Citations per Paper – {median_label} – Your Rank: #{your_median_rank} ({your_median_value:.2f} citations)",
         xaxis_title="AE Rank (Highest to Lowest Median)",
         yaxis_title="Median Citations",
         height=350,
