@@ -114,6 +114,10 @@ if identified_ae is not None:
     user_accepts = len(user_papers[user_papers['Accept or Reject Final Decision'] == 'Accept'])
     user_rejects = len(user_papers[user_papers['Accept or Reject Final Decision'] == 'Reject'])
     
+    # Calculate pack totals for use in pie charts
+    total_accepts = len(df_filtered[df_filtered['Accept or Reject Final Decision'] == 'Accept'])
+    total_rejects = len(df_filtered[df_filtered['Accept or Reject Final Decision'] == 'Reject'])
+    
     metric1, metric2, metric3, metric4 = st.columns(4)
     with metric1:
         st.metric("Total Reviews", user_reviews)
@@ -457,8 +461,6 @@ with col4:
 
 # Accept/Reject summary
 col1, col2, col3 = st.columns(3)
-total_accepts = len(df_filtered[df_filtered['Accept or Reject Final Decision'] == 'Accept'])
-total_rejects = len(df_filtered[df_filtered['Accept or Reject Final Decision'] == 'Reject'])
 total_all = total_accepts + total_rejects
 
 with col1:
