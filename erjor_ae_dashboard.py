@@ -14,31 +14,45 @@ st.set_page_config(
 # Load and cache data
 @st.cache_data
 def load_data():
-    df = pd.read_excel('AE-citations-combined.xlsx', sheet_name='Sheet1')
+    # Load main AE dataset
+    ae_df = pd.read_csv('AEs.csv', encoding='latin-1')
+    ae_df['Latest Decision Date'] = pd.to_datetime(ae_df['Latest Decision Date'], errors='coerce')
     
-    # Convert Excel date serial to datetime
-    # Excel stores dates as serial numbers from 1900-01-01
-    df['Latest Decision Date'] = pd.to_datetime(
-        df['Latest Decision Date'], 
+    # Load citations data
+    citations_df = pd.read_excel('AE-citations-combined.xlsx', sheet_name='Sheet1')
+    citations_df['Latest Decision Date'] = pd.to_datetime(
+        citations_df['Latest Decision Date'], 
         unit='D', 
         origin=pd.Timestamp('1899-12-30')
     )
     
-    return df
+    # Merge on Manuscript ID to get citations
+    merged = ae_df.merge(
+        citations_df[['Manuscript ID - Original', 'Number of Citations']],
+        on='Manuscript ID - Original',
+        how='left'
+    )
+    # Fill missing citations with 0
+    merged['Number of Citations'] = merged['Number of Citations'].fillna(0)
+    
+    return merged
 
 df = load_data()
 
-# Use all available data (shows full career history at ERJOR)
-df_12m = df.copy()
+# Set time window: Aug 2022 - Aug 2024
+cutoff_start = pd.Timestamp('2022-08-01')
+cutoff_end = pd.Timestamp('2024-08-31')
+df_filtered = df[
+    (df['Latest Decision Date'] >= cutoff_start) & 
+    (df['Latest Decision Date'] <= cutoff_end)
+].copy()
 
 # Compute AE metrics
-ae_metrics = df_12m.groupby('Editor Names').agg({
+ae_metrics = df_filtered.groupby('Editor Names').agg({
     'Number of Citations': ['count', 'mean', 'median', 'sum'],
-    'Manuscript ID - Original': 'count'
 }).round(2)
 
-ae_metrics.columns = ['review_count', 'avg_citations', 'median_citations', 'total_citations', '_']
-ae_metrics = ae_metrics.drop('_', axis=1)
+ae_metrics.columns = ['review_count', 'avg_citations', 'median_citations', 'total_citations']
 ae_metrics = ae_metrics.sort_values('review_count', ascending=False).reset_index()
 ae_metrics['rank'] = range(1, len(ae_metrics) + 1)
 ae_metrics['Editor Name (Clean)'] = ae_metrics['Editor Names'].str.replace('(Associate Editor)', '').str.strip()
@@ -72,77 +86,15 @@ if user_surname:
 # MAIN PAGE
 # ============================================================================
 st.title("ERJOR Associate Editor Activity & Citations")
-date_min = df['Latest Decision Date'].min()
-date_max = df['Latest Decision Date'].max()
-st.markdown(f"_Full career data ({date_min.strftime('%b %Y')} – {date_max.strftime('%b %Y')})_")
+date_min = df_filtered['Latest Decision Date'].min()
+date_max = df_filtered['Latest Decision Date'].max()
+st.markdown(f"_Data from {date_min.strftime('%b %Y')} – {date_max.strftime('%b %Y')}_")
 
 # ============================================================================
 # SECTION 1: Individual AE View (if identified)
 # ============================================================================
 if identified_ae is not None:
     st.divider()
-    col1, col2 = st.columns([2, 3])
-    
-    with col1:
-        st.subheader("📍 Your Position in the Pack")
-        
-        rank_col, reviews_col, avg_cites_col = st.columns(3)
-        with rank_col:
-            st.metric(
-                "Rank",
-                f"#{identified_ae['rank']} of {len(ae_metrics)}"
-            )
-        with reviews_col:
-            st.metric(
-                "Total Reviews",
-                int(identified_ae['review_count'])
-            )
-        with avg_cites_col:
-            st.metric(
-                "Avg Citations",
-                f"{identified_ae['avg_citations']:.1f}"
-            )
-        
-        # Pack comparison
-        review_counts = ae_metrics['review_count'].values
-        percentile = (sum(review_counts < identified_ae['review_count']) / len(review_counts) * 100)
-        
-        st.write(f"""
-        **Your metrics:**
-        - Total citations across reviews: {int(identified_ae['total_citations'])}
-        - Median citations per review: {identified_ae['median_citations']:.1f}
-        - You're in the **top {100 - percentile:.0f}%** by review volume
-        """)
-    
-    with col2:
-        # Histogram of review counts with your position highlighted
-        fig = go.Figure()
-        
-        fig.add_trace(go.Histogram(
-            x=ae_metrics['review_count'],
-            nbinsx=15,
-            name='All AEs',
-            marker_color='#0072B5',
-            opacity=0.7
-        ))
-        
-        fig.add_vline(
-            x=identified_ae['review_count'],
-            line_dash="dash",
-            line_color="#BC3C29",
-            annotation_text=f"You: {int(identified_ae['review_count'])} reviews",
-            annotation_position="top right"
-        )
-        
-        fig.update_layout(
-            title="Your Position in Pack Distribution",
-            xaxis_title="Total Reviews",
-            yaxis_title="Count of AEs",
-            height=300,
-            showlegend=False,
-            hovermode='x unified'
-        )
-        st.plotly_chart(fig, use_container_width=True)
     
     # ===== YOUR METRICS CARDS =====
     st.subheader("📊 Your Key Metrics")
@@ -158,7 +110,7 @@ if identified_ae is not None:
     user_avg_citations = identified_ae['avg_citations']
     
     # Count accepts/rejects
-    user_papers = df_12m[df_12m['Editor Names'] == identified_ae['Editor Names']]
+    user_papers = df_filtered[df_filtered['Editor Names'] == identified_ae['Editor Names']]
     user_accepts = len(user_papers[user_papers['Accept or Reject Final Decision'] == 'Accept'])
     user_rejects = len(user_papers[user_papers['Accept or Reject Final Decision'] == 'Reject'])
     
@@ -171,6 +123,27 @@ if identified_ae is not None:
         st.metric("Rejects", user_rejects)
     with metric4:
         st.metric("Total Citations", user_citations)
+    
+    # ===== MANUSCRIPT TYPE BREAKDOWN =====
+    st.subheader("📋 Breakdown by Manuscript Type")
+    
+    # Pie chart
+    manuscript_breakdown = user_papers['Manuscript Type'].value_counts()
+    
+    fig_types = go.Figure(data=[go.Pie(
+        labels=manuscript_breakdown.index,
+        values=manuscript_breakdown.values,
+        marker_colors=['#0072B5', '#BC3C29', '#E18727', '#20854E', '#7876B1', '#FFC000'],
+        textposition='inside',
+        textinfo='label+percent',
+        hovertemplate='<b>%{label}</b><br>Count: %{value}<br>Percent: %{percent}<extra></extra>'
+    )])
+    
+    fig_types.update_layout(
+        title=f"Your Papers by Manuscript Type ({user_reviews} total)",
+        height=350,
+    )
+    st.plotly_chart(fig_types, use_container_width=True)
     
     # ===== WATERFALL PLOTS =====
     st.subheader("📈 Your Position Across Key Metrics")
@@ -207,7 +180,7 @@ if identified_ae is not None:
     
     with col1:
         # Calculate accept/reject for all AEs
-        ae_decisions = df_12m.groupby('Editor Names').apply(
+        ae_decisions = df_filtered.groupby('Editor Names').apply(
             lambda x: pd.Series({
                 'accepts': len(x[x['Accept or Reject Final Decision'] == 'Accept']),
                 'rejects': len(x[x['Accept or Reject Final Decision'] == 'Reject'])
@@ -294,23 +267,21 @@ if identified_ae is not None:
     
     # Your papers
     st.subheader("📄 Your Reviews & Citations")
-    user_papers = df_12m[
-        df_12m['Editor Names'] == identified_ae['Editor Names']
-    ][['Item Title', 'Number of Citations', 'Manuscript Type', 'Latest Decision Date', 'Accept or Reject Final Decision']].copy()
+    user_papers_display = user_papers[['Manuscript Title', 'Number of Citations', 'Manuscript Type', 'Latest Decision Date', 'Accept or Reject Final Decision']].copy()
     
-    user_papers['Latest Decision Date'] = user_papers['Latest Decision Date'].dt.strftime('%b %Y')
-    user_papers = user_papers.sort_values('Number of Citations', ascending=False)
-    user_papers.columns = ['Paper Title', 'Citations', 'Type', 'Decision Date', 'Outcome']
+    user_papers_display['Latest Decision Date'] = user_papers_display['Latest Decision Date'].dt.strftime('%b %Y')
+    user_papers_display = user_papers_display.sort_values('Number of Citations', ascending=False)
+    user_papers_display.columns = ['Paper Title', 'Citations', 'Type', 'Decision Date', 'Outcome']
     
     st.dataframe(
-        user_papers,
+        user_papers_display,
         use_container_width=True,
         height=400,
         hide_index=True
     )
     
     # Download
-    csv = user_papers.to_csv(index=False)
+    csv = user_papers_display.to_csv(index=False)
     st.download_button(
         label="📥 Download your papers (CSV)",
         data=csv,
@@ -322,7 +293,7 @@ if identified_ae is not None:
 # SECTION 2: Anonymized Pack Rankings (always shown)
 # ============================================================================
 st.divider()
-st.subheader("📊 Anonymized AE Rankings (All Data)")
+st.subheader("📊 Anonymized AE Rankings")
 
 # Ranking table
 ranking_table = ae_metrics[[
@@ -367,8 +338,8 @@ with col4:
 
 # Accept/Reject summary
 col1, col2, col3 = st.columns(3)
-total_accepts = len(df_12m[df_12m['Accept or Reject Final Decision'] == 'Accept'])
-total_rejects = len(df_12m[df_12m['Accept or Reject Final Decision'] == 'Reject'])
+total_accepts = len(df_filtered[df_filtered['Accept or Reject Final Decision'] == 'Accept'])
+total_rejects = len(df_filtered[df_filtered['Accept or Reject Final Decision'] == 'Reject'])
 total_all = total_accepts + total_rejects
 
 with col1:
@@ -390,6 +361,25 @@ with col2:
     st.metric("Mean Avg Citations/AE", f"{mean_cites_per_ae:.2f}")
 with col3:
     st.metric("Median Avg Citations/AE", f"{ae_metrics['avg_citations'].median():.2f}")
+
+# Manuscript Type breakdown across pack
+st.subheader("📋 All Papers by Manuscript Type")
+manuscript_all = df_filtered['Manuscript Type'].value_counts()
+
+fig_types_all = go.Figure(data=[go.Pie(
+    labels=manuscript_all.index,
+    values=manuscript_all.values,
+    marker_colors=['#0072B5', '#BC3C29', '#E18727', '#20854E', '#7876B1', '#FFC000', '#00B4D8', '#90E0EF'],
+    textposition='inside',
+    textinfo='label+percent',
+    hovertemplate='<b>%{label}</b><br>Count: %{value}<br>Percent: %{percent}<extra></extra>'
+)])
+
+fig_types_all.update_layout(
+    title=f"All Papers by Manuscript Type ({len(df_filtered)} total)",
+    height=400,
+)
+st.plotly_chart(fig_types_all, use_container_width=True)
 
 # Citation distribution across the pack
 fig_dist = go.Figure()
@@ -417,7 +407,7 @@ st.divider()
 st.markdown("""
 **Notes on this dashboard:**
 - Rankings are anonymized; only you can identify yourself
-- Data covers all reviews processed through ERJOR (full career history)
+- Data covers decisions from Aug 2022 to Aug 2024
 - Citation counts are from Web of Science JCR (may include self-citations)
 - "Avg/Median Citations" reflects papers you reviewed and their subsequent citation impact
 - This is a tool for reflecting on editorial contribution and paper impact, not performance evaluation
