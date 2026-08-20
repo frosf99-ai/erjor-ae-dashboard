@@ -346,30 +346,61 @@ if identified_ae is not None:
     
     # Waterfall 3: Median Citations per Paper (with filter)
     st.write("**Filter Median Citations by Type:**")
-    col_med1, col_med2, col_med3 = st.columns(3)
+    col_med1, col_med2, col_med3, col_med4 = st.columns(4)
     
     with col_med1:
-        btn_med_all = st.button("📊 All Types", use_container_width=True, key='btn_med_all')
+        btn_med_combo = st.button("📊 Orig & Reviews", use_container_width=True, key='btn_med_combo')
     with col_med2:
-        btn_med_orig = st.button("📄 Original Research Only", use_container_width=True, key='btn_med_orig')
+        btn_med_orig = st.button("📄 Original Only", use_container_width=True, key='btn_med_orig')
     with col_med3:
         btn_med_review = st.button("📚 Reviews Only", use_container_width=True, key='btn_med_review')
+    with col_med4:
+        btn_med_all = st.button("📋 All Types", use_container_width=True, key='btn_med_all')
     
     # Track median filter state
     if 'median_filter_state' not in st.session_state:
         st.session_state.median_filter_state = 'All Types'
     
-    if btn_med_all:
-        st.session_state.median_filter_state = 'All Types'
+    if btn_med_combo:
+        st.session_state.median_filter_state = 'Orig Research & Reviews'
     elif btn_med_orig:
         st.session_state.median_filter_state = 'Original Research Article'
     elif btn_med_review:
         st.session_state.median_filter_state = 'Review'
+    elif btn_med_all:
+        st.session_state.median_filter_state = 'All Types'
     
     median_filter = st.session_state.median_filter_state
     
     # Filter data for median calculation
-    if median_filter == 'All Types':
+    if median_filter == 'Orig Research & Reviews':
+        df_median_filtered = df_accepted[df_accepted['Manuscript Type'].isin(['Original Research Article', 'Review'])]
+        ae_median_filtered = df_median_filtered.groupby('Editor Names').agg({
+            'Number of Citations': ['median'],
+        }).round(2)
+        ae_median_filtered.columns = ['median_citations']
+        ae_median_filtered = ae_median_filtered.reset_index()
+        ae_median_filtered = ae_median_filtered.sort_values('median_citations', ascending=False).reset_index(drop=True)
+        median_label = "Original Research & Reviews"
+    elif median_filter == 'Original Research Article':
+        df_median_filtered = df_accepted[df_accepted['Manuscript Type'] == 'Original Research Article']
+        ae_median_filtered = df_median_filtered.groupby('Editor Names').agg({
+            'Number of Citations': ['median'],
+        }).round(2)
+        ae_median_filtered.columns = ['median_citations']
+        ae_median_filtered = ae_median_filtered.reset_index()
+        ae_median_filtered = ae_median_filtered.sort_values('median_citations', ascending=False).reset_index(drop=True)
+        median_label = "Original Research"
+    elif median_filter == 'Review':
+        df_median_filtered = df_accepted[df_accepted['Manuscript Type'] == 'Review']
+        ae_median_filtered = df_median_filtered.groupby('Editor Names').agg({
+            'Number of Citations': ['median'],
+        }).round(2)
+        ae_median_filtered.columns = ['median_citations']
+        ae_median_filtered = ae_median_filtered.reset_index()
+        ae_median_filtered = ae_median_filtered.sort_values('median_citations', ascending=False).reset_index(drop=True)
+        median_label = "Reviews"
+    else:  # All Types
         df_median_filtered = df_accepted
         ae_median_filtered = df_median_filtered.groupby('Editor Names').agg({
             'Number of Citations': ['median'],
@@ -378,24 +409,6 @@ if identified_ae is not None:
         ae_median_filtered = ae_median_filtered.reset_index()
         ae_median_filtered = ae_median_filtered.sort_values('median_citations', ascending=False).reset_index(drop=True)
         median_label = "All Types"
-    elif median_filter == 'Original Research Article':
-        df_median_filtered = df_accepted[df_accepted['Manuscript Type'] == 'Original Research Article']
-        ae_median_filtered = df_median_filtered.groupby('Editor Names').agg({
-            'Number of Citations': ['median'],
-        }).round(1)
-        ae_median_filtered.columns = ['median_citations']
-        ae_median_filtered = ae_median_filtered.reset_index()
-        ae_median_filtered = ae_median_filtered.sort_values('median_citations', ascending=False).reset_index(drop=True)
-        median_label = "Original Research"
-    else:  # Review
-        df_median_filtered = df_accepted[df_accepted['Manuscript Type'] == 'Review']
-        ae_median_filtered = df_median_filtered.groupby('Editor Names').agg({
-            'Number of Citations': ['median'],
-        }).round(1)
-        ae_median_filtered.columns = ['median_citations']
-        ae_median_filtered = ae_median_filtered.reset_index()
-        ae_median_filtered = ae_median_filtered.sort_values('median_citations', ascending=False).reset_index(drop=True)
-        median_label = "Reviews"
     
     # Create waterfall
     fig_median = go.Figure()
