@@ -573,15 +573,19 @@ if identified_ae is not None:
         article_labels = [title[:40] + '...' if len(title) > 40 else title 
                          for title in your_accepted['Manuscript Title']]
         
+        # For visualization: replace 0s with small value (0.2) so bars are visible, but keep labels as actual values
+        y_values_display = your_accepted['Number of Citations'].copy()
+        y_values_display = y_values_display.replace(0, 0.2)
+        
         fig_accepted = go.Figure()
         fig_accepted.add_trace(go.Bar(
             x=list(range(1, len(your_accepted) + 1)),
-            y=your_accepted['Number of Citations'],
+            y=y_values_display,
             marker_color=colors_articles,
             text=your_accepted['Number of Citations'].astype(int),
             customdata=your_accepted['Manuscript Type'],
             textposition='outside',
-            hovertemplate='<b>%{customdata}</b><br>Citations: %{y}<extra></extra>',
+            hovertemplate='<b>%{customdata}</b><br>Citations: %{y:.0f}<extra></extra>',
             showlegend=False
         ))
         
