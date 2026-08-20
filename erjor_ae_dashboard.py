@@ -98,6 +98,10 @@ date_min = df_filtered['Latest Decision Date'].min()
 date_max = df_filtered['Latest Decision Date'].max()
 st.markdown(f"_Data from {date_min.strftime('%b %Y')} – {date_max.strftime('%b %Y')}_")
 
+# Calculate pack totals (always needed for later sections)
+total_accepts = len(df_filtered[df_filtered['Accept or Reject Final Decision'] == 'Accept'])
+total_rejects = len(df_filtered[df_filtered['Accept or Reject Final Decision'] == 'Reject'])
+
 # ============================================================================
 # SECTION 1: Individual AE View (if identified)
 # ============================================================================
@@ -121,10 +125,6 @@ if identified_ae is not None:
     user_papers = df_filtered[df_filtered['Editor Names'] == identified_ae['Editor Names']]
     user_accepts = len(user_papers[user_papers['Accept or Reject Final Decision'] == 'Accept'])
     user_rejects = len(user_papers[user_papers['Accept or Reject Final Decision'] == 'Reject'])
-    
-    # Calculate pack totals for use in pie charts
-    total_accepts = len(df_filtered[df_filtered['Accept or Reject Final Decision'] == 'Accept'])
-    total_rejects = len(df_filtered[df_filtered['Accept or Reject Final Decision'] == 'Reject'])
     
     metric1, metric2, metric3, metric4 = st.columns(4)
     with metric1:
