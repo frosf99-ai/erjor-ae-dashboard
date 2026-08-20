@@ -48,12 +48,20 @@ df_filtered = df[
 ].copy()
 
 # Compute AE metrics
-ae_metrics = df_filtered.groupby('Editor Names').agg({
-    'Number of Citations': ['count', 'mean', 'median', 'sum'],
-}).round(2)
+# Count all papers reviewed (accepted + rejected)
+review_counts = df_filtered.groupby('Editor Names').size().reset_index(name='review_count')
 
-ae_metrics.columns = ['review_count', 'avg_citations', 'median_citations', 'total_citations']
-ae_metrics = ae_metrics.sort_values('review_count', ascending=False).reset_index()
+# Calculate citations metrics from ACCEPTED PAPERS ONLY
+df_accepted = df_filtered[df_filtered['Accept or Reject Final Decision'] == 'Accept'].copy()
+citation_metrics = df_accepted.groupby('Editor Names').agg({
+    'Number of Citations': ['mean', 'median', 'sum'],
+}).round(2)
+citation_metrics.columns = ['avg_citations', 'median_citations', 'total_citations']
+citation_metrics = citation_metrics.reset_index()
+
+# Merge review counts with citation metrics
+ae_metrics = review_counts.merge(citation_metrics, on='Editor Names', how='left')
+ae_metrics = ae_metrics.sort_values('review_count', ascending=False).reset_index(drop=True)
 ae_metrics['rank'] = range(1, len(ae_metrics) + 1)
 ae_metrics['Editor Name (Clean)'] = ae_metrics['Editor Names'].str.replace('(Associate Editor)', '').str.strip()
 
@@ -176,17 +184,31 @@ if identified_ae is not None:
     
     # Filter by manuscript type for decisions pie charts
     st.write("**Filter by Manuscript Type:**")
-    col_filter1, col_filter2, col_filter3 = st.columns(3)
-    
-    all_manuscript_types = sorted(df_filtered['Manuscript Type'].unique())
+    col_filter1, col_filter2, col_filter3, col_filter4, col_filter5 = st.columns(5)
     
     with col_filter1:
-        selected_type = st.selectbox(
-            "Select manuscript type:",
-            ['All Types'] + all_manuscript_types,
-            index=0,
-            key='manuscript_filter'
-        )
+        btn_all = st.button("📋 All Types", use_container_width=True, key='btn_all_types')
+    with col_filter2:
+        btn_orig = st.button("📊 Original Research", use_container_width=True, key='btn_orig')
+    with col_filter3:
+        btn_review = st.button("📚 Review", use_container_width=True, key='btn_review')
+    with col_filter4:
+        btn_letter = st.button("✉️ Research Letter", use_container_width=True, key='btn_letter')
+    
+    # Track button state
+    if 'type_filter_state' not in st.session_state:
+        st.session_state.type_filter_state = 'All Types'
+    
+    if btn_all:
+        st.session_state.type_filter_state = 'All Types'
+    elif btn_orig:
+        st.session_state.type_filter_state = 'Original Research Article'
+    elif btn_review:
+        st.session_state.type_filter_state = 'Review'
+    elif btn_letter:
+        st.session_state.type_filter_state = 'Research Letter'
+    
+    selected_type = st.session_state.type_filter_state
     
     # Filter data based on selection
     if selected_type == 'All Types':
@@ -292,7 +314,7 @@ if identified_ae is not None:
         })
     ).reset_index()
     ae_decisions['pct_accept'] = (ae_decisions['accepts'] / ae_decisions['total'] * 100).round(1)
-    ae_decisions = ae_decisions.sort_values('pct_accept', ascending=False)
+    ae_decisions = ae_decisions.sort_values('pct_accept', ascending=False).reset_index(drop=True)
     ae_decisions['rank'] = range(1, len(ae_decisions) + 1)
     
     colors_pct = ['#20854E' if name != identified_ae['Editor Names'] else '#BC3C29' 
@@ -361,7 +383,7 @@ if identified_ae is not None:
         })
     ).reset_index()
     ae_top_decile['pct_top_decile'] = (ae_top_decile['in_top_decile'] / ae_top_decile['total'] * 100).round(1)
-    ae_top_decile = ae_top_decile.sort_values('pct_top_decile', ascending=False)
+    ae_top_decile = ae_top_decile.sort_values('pct_top_decile', ascending=False).reset_index(drop=True)
     ae_top_decile['rank'] = range(1, len(ae_top_decile) + 1)
     
     colors_decile = ['#FFC000' if name != identified_ae['Editor Names'] else '#BC3C29' 
@@ -429,12 +451,13 @@ if identified_ae is not None:
         ))
         
         fig_accepted.update_layout(
-            title=f"Your {len(your_accepted)} Accepted Articles – Citations (Sorted Highest to Lowest)",
-            xaxis_title="Article (Sorted by Citation Count)",
-            yaxis_title="Number of Citations",
+            title=f"Your {len(your_accepted)} Accepted Articles – Citations",
+            xaxis_title="",
+            yaxis_title="Citations",
             height=400,
             hovermode='x unified',
-            bargap=0.3
+            bargap=0.3,
+            showlegend=False
         )
         st.plotly_chart(fig_accepted, use_container_width=True)
     else:
@@ -562,6 +585,8 @@ st.markdown("""
 - Rankings are anonymized; only you can identify yourself
 - Data covers decisions from Aug 2022 to Aug 2024
 - Citation counts are from Web of Science JCR (may include self-citations)
-- "Avg/Median Citations" reflects papers you reviewed and their subsequent citation impact
+- **"Mean/Median/Total Citations"** metrics show citations for **accepted papers only** (rejected papers have 0 citations and aren't included)
+- "Total Reviews" = all papers reviewed (accepted + rejected)
+- "Accepts/Rejects" = count of decisions for each outcome
 - This is a tool for reflecting on editorial contribution and paper impact, not performance evaluation
 """)
