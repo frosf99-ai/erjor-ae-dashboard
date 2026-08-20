@@ -344,33 +344,82 @@ if identified_ae is not None:
     )
     st.plotly_chart(fig_pct_accept, use_container_width=True)
     
-    # Waterfall 3: Mean Citations per Paper
-    fig_mean = go.Figure()
-    ae_sorted_mean = ae_metrics.sort_values('avg_citations', ascending=False).reset_index(drop=True)
+    # Waterfall 3: Median Citations per Paper (with filter)
+    st.write("**Filter Median Citations by Type:**")
+    col_med1, col_med2, col_med3 = st.columns(3)
     
-    colors_mean = ['#7876B1' if name != identified_ae['Editor Names'] else '#BC3C29' 
-                   for name in ae_sorted_mean['Editor Names']]
+    with col_med1:
+        btn_med_all = st.button("📊 All Types", use_container_width=True, key='btn_med_all')
+    with col_med2:
+        btn_med_orig = st.button("📄 Original Research Only", use_container_width=True, key='btn_med_orig')
+    with col_med3:
+        btn_med_review = st.button("📚 Reviews Only", use_container_width=True, key='btn_med_review')
     
-    fig_mean.add_trace(go.Bar(
-        x=ae_sorted_mean.index + 1,
-        y=ae_sorted_mean['avg_citations'],
-        marker_color=colors_mean,
-        text=ae_sorted_mean['avg_citations'].astype(str),
+    # Track median filter state
+    if 'median_filter_state' not in st.session_state:
+        st.session_state.median_filter_state = 'All Types'
+    
+    if btn_med_all:
+        st.session_state.median_filter_state = 'All Types'
+    elif btn_med_orig:
+        st.session_state.median_filter_state = 'Original Research Article'
+    elif btn_med_review:
+        st.session_state.median_filter_state = 'Review'
+    
+    median_filter = st.session_state.median_filter_state
+    
+    # Filter data for median calculation
+    if median_filter == 'All Types':
+        df_median_filtered = df_accepted
+        median_label = "All Types"
+    elif median_filter == 'Original Research Article':
+        df_median_filtered = df_accepted[df_accepted['Manuscript Type'] == 'Original Research Article']
+        median_label = "Original Research"
+    else:  # Review
+        df_median_filtered = df_accepted[df_accepted['Manuscript Type'] == 'Review']
+        median_label = "Reviews"
+    
+    # Recalculate median for filtered data
+    ae_median_filtered = df_median_filtered.groupby('Editor Names').agg({
+        'Number of Citations': ['median'],
+    }).round(1)
+    ae_median_filtered.columns = ['median_citations']
+    ae_median_filtered = ae_median_filtered.reset_index()
+    ae_median_filtered = ae_median_filtered.sort_values('median_citations', ascending=False).reset_index(drop=True)
+    
+    # Create waterfall
+    fig_median = go.Figure()
+    colors_median = ['#7876B1' if name != identified_ae['Editor Names'] else '#BC3C29' 
+                     for name in ae_median_filtered['Editor Names']]
+    
+    fig_median.add_trace(go.Bar(
+        x=ae_median_filtered.index + 1,
+        y=ae_median_filtered['median_citations'],
+        marker_color=colors_median,
+        text=ae_median_filtered['median_citations'].astype(str),
         textposition='outside',
-        hovertemplate='<b>Rank %{x}</b><br>Mean Citations: %{y:.2f}<extra></extra>',
+        hovertemplate='<b>Rank %{x}</b><br>Median Citations: %{y}<extra></extra>',
         showlegend=False
     ))
     
-    your_mean_rank = ae_sorted_mean[ae_sorted_mean['Editor Names'] == identified_ae['Editor Names']].index[0] + 1
-    fig_mean.update_layout(
-        title=f"Mean Citations per Paper – Your Rank: #{your_mean_rank} ({identified_ae['avg_citations']:.2f} citations)",
-        xaxis_title="AE Rank (Highest to Lowest Mean)",
-        yaxis_title="Mean Citations",
+    # Find your rank in filtered data
+    your_row_filtered = ae_median_filtered[ae_median_filtered['Editor Names'] == identified_ae['Editor Names']]
+    if len(your_row_filtered) > 0:
+        your_median_rank = your_row_filtered.index[0] + 1
+        your_median_value = your_row_filtered['median_citations'].values[0]
+    else:
+        your_median_rank = "N/A"
+        your_median_value = "N/A"
+    
+    fig_median.update_layout(
+        title=f"Median Citations per Paper – {median_label} – Your Rank: #{your_median_rank} ({your_median_value} citations)",
+        xaxis_title="AE Rank (Highest to Lowest Median)",
+        yaxis_title="Median Citations",
         height=350,
         hovermode='x unified',
         bargap=0.2
     )
-    st.plotly_chart(fig_mean, use_container_width=True)
+    st.plotly_chart(fig_median, use_container_width=True)
     
     # Waterfall 4: % of Papers in Top Decile for Citations
     # Calculate top decile threshold
@@ -440,7 +489,7 @@ if identified_ae is not None:
         
         fig_accepted = go.Figure()
         fig_accepted.add_trace(go.Bar(
-            x=your_accepted.index + 1,
+            x=range(1, len(your_accepted) + 1),
             y=your_accepted['Number of Citations'],
             marker_color=colors_articles,
             text=your_accepted['Number of Citations'].astype(int),
@@ -456,7 +505,7 @@ if identified_ae is not None:
             yaxis_title="Citations",
             height=400,
             hovermode='x unified',
-            bargap=0.3,
+            bargap=0,
             showlegend=False
         )
         st.plotly_chart(fig_accepted, use_container_width=True)
