@@ -144,6 +144,154 @@ if identified_ae is not None:
         )
         st.plotly_chart(fig, use_container_width=True)
     
+    # ===== YOUR METRICS CARDS =====
+    st.subheader("📊 Your Key Metrics")
+    
+    # Turnaround time placeholder
+    st.info("⏱️ **Turnaround Time** – Data not yet available. Will be added when submission-to-decision dates are included in the dataset.")
+    
+    st.divider()
+    
+    # Calculate metrics for identified AE
+    user_reviews = int(identified_ae['review_count'])
+    user_citations = int(identified_ae['total_citations'])
+    user_avg_citations = identified_ae['avg_citations']
+    
+    # Count accepts/rejects
+    user_papers = df_12m[df_12m['Editor Names'] == identified_ae['Editor Names']]
+    user_accepts = len(user_papers[user_papers['Accept or Reject Final Decision'] == 'Accept'])
+    user_rejects = len(user_papers[user_papers['Accept or Reject Final Decision'] == 'Reject'])
+    
+    metric1, metric2, metric3, metric4 = st.columns(4)
+    with metric1:
+        st.metric("Total Reviews", user_reviews)
+    with metric2:
+        st.metric("Accepts", user_accepts)
+    with metric3:
+        st.metric("Rejects", user_rejects)
+    with metric4:
+        st.metric("Total Citations", user_citations)
+    
+    # ===== WATERFALL PLOTS =====
+    st.subheader("📈 Your Position Across Key Metrics")
+    
+    # Waterfall 1: Total Reviews
+    fig_reviews = go.Figure()
+    ae_sorted_reviews = ae_metrics.sort_values('review_count', ascending=False).reset_index(drop=True)
+    
+    colors = ['#0072B5' if name != identified_ae['Editor Names'] else '#BC3C29' 
+              for name in ae_sorted_reviews['Editor Names']]
+    
+    fig_reviews.add_trace(go.Bar(
+        x=ae_sorted_reviews.index + 1,
+        y=ae_sorted_reviews['review_count'],
+        marker_color=colors,
+        text=ae_sorted_reviews['review_count'].astype(int),
+        textposition='outside',
+        hovertemplate='<b>Rank %{x}</b><br>Reviews: %{y}<extra></extra>',
+        showlegend=False
+    ))
+    
+    fig_reviews.update_layout(
+        title=f"Total Reviews – Your Rank: #{identified_ae['rank']} ({user_reviews} reviews)",
+        xaxis_title="AE Rank (Highest to Lowest)",
+        yaxis_title="Number of Reviews",
+        height=350,
+        hovermode='x unified',
+        bargap=0.2
+    )
+    st.plotly_chart(fig_reviews, use_container_width=True)
+    
+    # Waterfall 2: Accept/Reject breakdown
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Calculate accept/reject for all AEs
+        ae_decisions = df_12m.groupby('Editor Names').apply(
+            lambda x: pd.Series({
+                'accepts': len(x[x['Accept or Reject Final Decision'] == 'Accept']),
+                'rejects': len(x[x['Accept or Reject Final Decision'] == 'Reject'])
+            })
+        ).reset_index()
+        ae_decisions = ae_decisions.sort_values('accepts', ascending=False)
+        ae_decisions['rank'] = range(1, len(ae_decisions) + 1)
+        
+        colors_accept = ['#20854E' if name != identified_ae['Editor Names'] else '#BC3C29' 
+                        for name in ae_decisions['Editor Names']]
+        
+        fig_accepts = go.Figure()
+        fig_accepts.add_trace(go.Bar(
+            x=ae_decisions.index + 1,
+            y=ae_decisions['accepts'],
+            marker_color=colors_accept,
+            text=ae_decisions['accepts'].astype(int),
+            textposition='outside',
+            hovertemplate='<b>Rank %{x}</b><br>Accepts: %{y}<extra></extra>',
+            showlegend=False
+        ))
+        
+        fig_accepts.update_layout(
+            title=f"Accepted Reviews – You: {user_accepts}",
+            xaxis_title="AE Rank (Most to Least)",
+            yaxis_title="Number of Accepts",
+            height=350,
+            hovermode='x unified',
+            bargap=0.2
+        )
+        st.plotly_chart(fig_accepts, use_container_width=True)
+    
+    with col2:
+        colors_reject = ['#E18727' if name != identified_ae['Editor Names'] else '#BC3C29' 
+                        for name in ae_decisions['Editor Names']]
+        
+        fig_rejects = go.Figure()
+        fig_rejects.add_trace(go.Bar(
+            x=ae_decisions.index + 1,
+            y=ae_decisions['rejects'],
+            marker_color=colors_reject,
+            text=ae_decisions['rejects'].astype(int),
+            textposition='outside',
+            hovertemplate='<b>Rank %{x}</b><br>Rejects: %{y}<extra></extra>',
+            showlegend=False
+        ))
+        
+        fig_rejects.update_layout(
+            title=f"Rejected Reviews – You: {user_rejects}",
+            xaxis_title="AE Rank (Most to Least)",
+            yaxis_title="Number of Rejects",
+            height=350,
+            hovermode='x unified',
+            bargap=0.2
+        )
+        st.plotly_chart(fig_rejects, use_container_width=True)
+    
+    # Waterfall 3: Total Citations
+    fig_citations = go.Figure()
+    ae_sorted_citations = ae_metrics.sort_values('total_citations', ascending=False).reset_index(drop=True)
+    
+    colors_cites = ['#7876B1' if name != identified_ae['Editor Names'] else '#BC3C29' 
+                    for name in ae_sorted_citations['Editor Names']]
+    
+    fig_citations.add_trace(go.Bar(
+        x=ae_sorted_citations.index + 1,
+        y=ae_sorted_citations['total_citations'],
+        marker_color=colors_cites,
+        text=ae_sorted_citations['total_citations'].astype(int),
+        textposition='outside',
+        hovertemplate='<b>Rank %{x}</b><br>Total Citations: %{y}<extra></extra>',
+        showlegend=False
+    ))
+    
+    fig_citations.update_layout(
+        title=f"Total Citations Across All Papers – Your Rank: #{ae_sorted_citations[ae_sorted_citations['Editor Names'] == identified_ae['Editor Names']].index[0] + 1} ({user_citations} citations)",
+        xaxis_title="AE Rank (Highest to Lowest)",
+        yaxis_title="Total Citations",
+        height=350,
+        hovermode='x unified',
+        bargap=0.2
+    )
+    st.plotly_chart(fig_citations, use_container_width=True)
+    
     # Your papers
     st.subheader("📄 Your Reviews & Citations")
     user_papers = df_12m[
@@ -217,24 +365,50 @@ with col3:
 with col4:
     st.metric("Median/AE", f"{ae_metrics['review_count'].median():.0f}")
 
-# Citation distribution across the pack
-fig_citations = go.Figure()
+# Accept/Reject summary
+col1, col2, col3 = st.columns(3)
+total_accepts = len(df_12m[df_12m['Accept or Reject Final Decision'] == 'Accept'])
+total_rejects = len(df_12m[df_12m['Accept or Reject Final Decision'] == 'Reject'])
+total_all = total_accepts + total_rejects
 
-fig_citations.add_trace(go.Box(
+with col1:
+    st.metric("Total Accepts", total_accepts)
+with col2:
+    st.metric("Total Rejects", total_rejects)
+with col3:
+    accept_rate = (total_accepts / total_all * 100) if total_all > 0 else 0
+    st.metric("Accept Rate", f"{accept_rate:.1f}%")
+
+# Citations summary
+col1, col2, col3 = st.columns(3)
+total_cites = int(ae_metrics['total_citations'].sum())
+mean_cites_per_ae = ae_metrics['avg_citations'].mean()
+
+with col1:
+    st.metric("Total Citations (All AEs)", total_cites)
+with col2:
+    st.metric("Mean Avg Citations/AE", f"{mean_cites_per_ae:.2f}")
+with col3:
+    st.metric("Median Avg Citations/AE", f"{ae_metrics['avg_citations'].median():.2f}")
+
+# Citation distribution across the pack
+fig_dist = go.Figure()
+
+fig_dist.add_trace(go.Box(
     y=ae_metrics['avg_citations'],
     name='Avg Citations per Review',
     marker_color='#0072B5',
     boxmean='sd'
 ))
 
-fig_citations.update_layout(
+fig_dist.update_layout(
     title="Distribution of Average Citations per Review Across AEs",
     yaxis_title="Average Citations",
     height=350,
     showlegend=False
 )
 
-st.plotly_chart(fig_citations, use_container_width=True)
+st.plotly_chart(fig_dist, use_container_width=True)
 
 # ============================================================================
 # SECTION 4: Notes
