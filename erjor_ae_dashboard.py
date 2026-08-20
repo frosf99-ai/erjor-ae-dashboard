@@ -193,6 +193,37 @@ if identified_ae is not None:
     with metric4:
         st.metric("Total Citations", user_citations)
     
+    # ===== YOUR TOTAL REVIEWS =====
+    st.subheader("📊 Your Total Reviews")
+    
+    fig_reviews = go.Figure()
+    ae_sorted_reviews = ae_metrics.sort_values('review_count', ascending=False).reset_index(drop=True)
+    
+    colors = ['#0072B5' if name != identified_ae['Editor Names'] else '#BC3C29' 
+              for name in ae_sorted_reviews['Editor Names']]
+    
+    fig_reviews.add_trace(go.Bar(
+        x=ae_sorted_reviews.index + 1,
+        y=ae_sorted_reviews['review_count'],
+        marker_color=colors,
+        text=ae_sorted_reviews['review_count'].astype(int),
+        textposition='outside',
+        hovertemplate='<b>Rank %{x}</b><br>Reviews: %{y}<extra></extra>',
+        showlegend=False
+    ))
+    
+    fig_reviews.update_layout(
+        title=f"Total Reviews – Your Rank: #{identified_ae['rank']} ({user_reviews} reviews)",
+        xaxis_title="AE Rank (Highest to Lowest)",
+        yaxis_title="Number of Reviews",
+        height=350,
+        hovermode='x unified',
+        bargap=0.2
+    )
+    st.plotly_chart(fig_reviews, use_container_width=True)
+    
+    st.divider()
+    
     # ===== MANUSCRIPT TYPE BREAKDOWN =====
     st.subheader("📋 Breakdown by Manuscript Type")
     
@@ -236,8 +267,8 @@ if identified_ae is not None:
         )
         st.plotly_chart(fig_types_all, use_container_width=True)
     
-    # ===== WATERFALL PLOTS =====
-    st.subheader("📈 Your Position Across Key Metrics")
+    # ===== YOUR EDITORIAL DECISIONS =====
+    st.subheader("📋 Your Editorial Decisions")
     
     # Filter by manuscript type for decisions pie charts
     st.write("**Filter by Manuscript Type:**")
@@ -336,34 +367,9 @@ if identified_ae is not None:
     
     st.divider()
     
-    # Waterfall 1: Total Reviews
-    fig_reviews = go.Figure()
-    ae_sorted_reviews = ae_metrics.sort_values('review_count', ascending=False).reset_index(drop=True)
+    st.subheader("📊 Your Performance Metrics")
     
-    colors = ['#0072B5' if name != identified_ae['Editor Names'] else '#BC3C29' 
-              for name in ae_sorted_reviews['Editor Names']]
-    
-    fig_reviews.add_trace(go.Bar(
-        x=ae_sorted_reviews.index + 1,
-        y=ae_sorted_reviews['review_count'],
-        marker_color=colors,
-        text=ae_sorted_reviews['review_count'].astype(int),
-        textposition='outside',
-        hovertemplate='<b>Rank %{x}</b><br>Reviews: %{y}<extra></extra>',
-        showlegend=False
-    ))
-    
-    fig_reviews.update_layout(
-        title=f"Total Reviews – Your Rank: #{identified_ae['rank']} ({user_reviews} reviews)",
-        xaxis_title="AE Rank (Highest to Lowest)",
-        yaxis_title="Number of Reviews",
-        height=350,
-        hovermode='x unified',
-        bargap=0.2
-    )
-    st.plotly_chart(fig_reviews, use_container_width=True)
-    
-    # Waterfall 2: % Accept
+    # Waterfall 2: % Accept Rate
     ae_decisions = df_filtered.groupby('Editor Names').apply(
         lambda x: pd.Series({
             'accepts': len(x[x['Accept or Reject Final Decision'] == 'Accept']),
