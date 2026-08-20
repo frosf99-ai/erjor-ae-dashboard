@@ -370,22 +370,27 @@ if identified_ae is not None:
     
     # Filter data for median calculation
     if median_filter == 'All Types':
-        df_median_filtered = df_accepted
+        ae_median_filtered = ae_metrics[['Editor Names', 'median_citations']].copy()
+        ae_median_filtered = ae_median_filtered.sort_values('median_citations', ascending=False).reset_index(drop=True)
         median_label = "All Types"
     elif median_filter == 'Original Research Article':
         df_median_filtered = df_accepted[df_accepted['Manuscript Type'] == 'Original Research Article']
+        ae_median_filtered = df_median_filtered.groupby('Editor Names').agg({
+            'Number of Citations': ['median'],
+        }).round(1)
+        ae_median_filtered.columns = ['median_citations']
+        ae_median_filtered = ae_median_filtered.reset_index()
+        ae_median_filtered = ae_median_filtered.sort_values('median_citations', ascending=False).reset_index(drop=True)
         median_label = "Original Research"
     else:  # Review
         df_median_filtered = df_accepted[df_accepted['Manuscript Type'] == 'Review']
+        ae_median_filtered = df_median_filtered.groupby('Editor Names').agg({
+            'Number of Citations': ['median'],
+        }).round(1)
+        ae_median_filtered.columns = ['median_citations']
+        ae_median_filtered = ae_median_filtered.reset_index()
+        ae_median_filtered = ae_median_filtered.sort_values('median_citations', ascending=False).reset_index(drop=True)
         median_label = "Reviews"
-    
-    # Recalculate median for filtered data
-    ae_median_filtered = df_median_filtered.groupby('Editor Names').agg({
-        'Number of Citations': ['median'],
-    }).round(1)
-    ae_median_filtered.columns = ['median_citations']
-    ae_median_filtered = ae_median_filtered.reset_index()
-    ae_median_filtered = ae_median_filtered.sort_values('median_citations', ascending=False).reset_index(drop=True)
     
     # Create waterfall
     fig_median = go.Figure()
@@ -467,7 +472,7 @@ if identified_ae is not None:
     st.subheader("📄 Your Accepted Articles – Citation Impact")
     
     your_accepted = user_papers[user_papers['Accept or Reject Final Decision'] == 'Accept'].copy()
-    your_accepted = your_accepted.sort_values('Number of Citations', ascending=False)
+    your_accepted = your_accepted.sort_values('Number of Citations', ascending=False).reset_index(drop=True)
     
     if len(your_accepted) > 0:
         # Create color map for manuscript types
@@ -489,7 +494,7 @@ if identified_ae is not None:
         
         fig_accepted = go.Figure()
         fig_accepted.add_trace(go.Bar(
-            x=range(1, len(your_accepted) + 1),
+            x=list(range(1, len(your_accepted) + 1)),
             y=your_accepted['Number of Citations'],
             marker_color=colors_articles,
             text=your_accepted['Number of Citations'].astype(int),
